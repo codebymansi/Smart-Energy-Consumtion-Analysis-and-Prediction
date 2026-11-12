@@ -219,7 +219,6 @@ elif page == "Data Analysis":
         height=350
     )
 
-
 # ----------------------------------
 # ENERGY PREDICTION
 # ----------------------------------
@@ -229,95 +228,310 @@ elif page == "Energy Prediction":
     st.header("Predict Household Energy Consumption")
 
     st.write(
-        "Enter the previous hourly consumption values "
-        "to predict the next hour."
+        "Use manual inputs or historical electricity data "
+        "to predict the next hour's energy consumption."
     )
 
-    col1, col2 = st.columns(2)
+    prediction_mode = st.radio(
+        "Choose Prediction Method",
+        [
+            "Manual Prediction",
+            "Automatic Prediction Using Historical Data"
+        ]
+    )
 
-    with col1:
+    # ==================================
+    # 1. MANUAL PREDICTION
+    # ==================================
 
-        prediction_date = st.date_input(
-            "Prediction Date"
-        )
+    if prediction_mode == "Manual Prediction":
 
-        prediction_hour = st.slider(
-            "Prediction Hour",
-            0,
-            23,
-            12
-        )
+        st.subheader("Manual Energy Prediction")
 
-        lag_1 = st.number_input(
-            "Previous Hour Consumption (kWh)",
+        col1, col2 = st.columns(2)
+
+        with col1:
+
+            prediction_date = st.date_input(
+                "Prediction Date"
+            )
+
+            prediction_hour = st.slider(
+                "Prediction Hour",
+                0,
+                23,
+                12
+            )
+
+            lag_1 = st.number_input(
+                "Previous Hour Consumption (kWh)",
+                min_value=0.0,
+                value=1.0
+            )
+
+            lag_2 = st.number_input(
+                "Consumption 2 Hours Ago (kWh)",
+                min_value=0.0,
+                value=1.0
+            )
+
+        with col2:
+
+            lag_3 = st.number_input(
+                "Consumption 3 Hours Ago (kWh)",
+                min_value=0.0,
+                value=1.0
+            )
+
+            rolling_mean = st.number_input(
+                "Average of Previous 3 Hours (kWh)",
+                min_value=0.0,
+                value=1.0
+            )
+
+            model_choice = st.selectbox(
+                "Select ML Model",
+                ["Linear Regression", "Random Forest"],
+                key="manual_model"
+            )
+
+        tariff = st.number_input(
+            "Electricity tariff (currency per kWh)",
             min_value=0.0,
-            value=1.0
+            value=8.0,
+            key="manual_tariff"
         )
 
-        lag_2 = st.number_input(
-            "Consumption 2 Hours Ago (kWh)",
-            min_value=0.0,
-            value=1.0
+        if st.button("Predict Energy Consumption"):
+
+            features = pd.DataFrame([{
+                "hour": prediction_hour,
+                "day": prediction_date.day,
+                "month": prediction_date.month,
+                "weekday": prediction_date.weekday(),
+                "lag_1": lag_1,
+                "lag_2": lag_2,
+                "lag_3": lag_3,
+                "rolling_mean_3": rolling_mean
+            }])
+
+            if model_choice == "Linear Regression":
+                prediction = linear_model.predict(features)[0]
+            else:
+                prediction = forest_model.predict(features)[0]
+
+            prediction = max(0, prediction)
+
+            st.success(
+                f"Predicted Energy Consumption: "
+                f"{prediction:.3f} kWh"
+            )
+
+            st.info(
+                "This is an estimated next-hour consumption value."
+            )
+
+            st.metric(
+                "Estimated Electricity Cost",
+                f"{prediction * tariff:.2f}"
+            )
+
+    # ==================================
+    # 2. AUTOMATIC PREDICTION
+    # ==================================
+
+    # ==================================
+    # 2. AUTOMATIC PREDICTION
+    # ==================================
+
+    else:
+
+        st.subheader("Automatic Energy Prediction")
+
+        st.write(
+            "Generate next-hour electricity consumption "
+            "predictions using historical dataset records."
         )
 
-    with col2:
-
-        lag_3 = st.number_input(
-            "Consumption 3 Hours Ago (kWh)",
-            min_value=0.0,
-            value=1.0
-        )
-
-        rolling_mean = st.number_input(
-            "Average of Previous 3 Hours (kWh)",
-            min_value=0.0,
-            value=1.0
-        )
-
-        model_choice = st.selectbox(
+        automatic_model = st.selectbox(
             "Select ML Model",
-            ["Linear Regression", "Random Forest"]
-        )
-
-    if st.button("Predict Energy Consumption"):
-
-        features = pd.DataFrame([{
-            "hour": prediction_hour,
-            "day": prediction_date.day,
-            "month": prediction_date.month,
-            "weekday": prediction_date.weekday(),
-            "lag_1": lag_1,
-            "lag_2": lag_2,
-            "lag_3": lag_3,
-            "rolling_mean_3": rolling_mean
-        }])
-
-        if model_choice == "Linear Regression":
-            prediction = linear_model.predict(features)[0]
-        else:
-            prediction = forest_model.predict(features)[0]
-
-        prediction = max(0, prediction)
-
-        st.success(
-            f"Predicted Energy Consumption: {prediction:.3f} kWh"
-        )
-
-        st.info(
-            "This is an estimated next-hour consumption value."
+            ["Linear Regression", "Random Forest"],
+            key="automatic_model"
         )
 
         tariff = st.number_input(
             "Electricity tariff (currency per kWh)",
             min_value=0.0,
-            value=8.0
+            value=8.0,
+            key="automatic_tariff"
         )
 
-        st.metric(
-            "Estimated Cost for One Hour",
-            f"{prediction * tariff:.2f}"
-        )
+        if st.button("Generate Automatic Prediction"):
 
+            try:
+
+                # 1. Prepare historical dataset
+                historical_data = df.copy()
+
+                # 2. Create proper datetime index
+                if "datetime" in historical_data.columns:
+
+                    historical_data["datetime"] = pd.to_datetime(
+                        historical_data["datetime"],
+                        errors="coerce"
+                    )
+
+                    historical_data = historical_data.dropna(
+                        subset=["datetime"]
+                    )
+
+                    historical_data = historical_data.set_index(
+                        "datetime"
+                    )
+
+                elif not isinstance(
+                    historical_data.index,
+                    pd.DatetimeIndex
+                ):
+
+                    raise ValueError(
+                        "Datetime information is missing. "
+                        "Please check the original dataset."
+                    )
+
+                # 3. Sort records chronologically
+                historical_data = historical_data.sort_index()
+
+                # 4. Convert electricity readings to numeric
+                historical_data["Global_active_power"] = pd.to_numeric(
+                    historical_data["Global_active_power"],
+                    errors="coerce"
+                )
+
+                historical_data = historical_data.dropna(
+                    subset=["Global_active_power"]
+                )
+
+                # 5. Calculate hourly average consumption
+                hourly_data = (
+                    historical_data["Global_active_power"]
+                    .resample("h")
+                    .mean()
+                )
+
+                # 6. Check the latest three consecutive hours
+                hourly_data = hourly_data.dropna()
+
+                if len(hourly_data) < 3:
+
+                    st.error(
+                        "Insufficient historical data for prediction."
+                    )
+
+                else:
+
+                    latest_three = hourly_data.iloc[-3:]
+
+                    time_differences = latest_three.index.to_series().diff()
+
+                    if not (
+                        time_differences.iloc[1:].eq(
+                            pd.Timedelta(hours=1)
+                        ).all()
+                    ):
+
+                        st.error(
+                            "The latest historical readings are not "
+                            "three consecutive hours. Please check "
+                            "the dataset's latest records."
+                        )
+
+                    else:
+
+                        # 7. Generate lag features
+                        lag_1 = float(latest_three.iloc[-1])
+                        lag_2 = float(latest_three.iloc[-2])
+                        lag_3 = float(latest_three.iloc[-3])
+
+                        rolling_mean = (
+                            lag_1 + lag_2 + lag_3
+                        ) / 3
+
+                        # 8. Calculate next prediction time
+                        next_time = (
+                            latest_three.index[-1]
+                            + pd.Timedelta(hours=1)
+                        )
+
+                        # 9. Prepare all eight ML features
+                        automatic_features = pd.DataFrame([{
+                            "hour": next_time.hour,
+                            "day": next_time.day,
+                            "month": next_time.month,
+                            "weekday": next_time.dayofweek,
+                            "lag_1": lag_1,
+                            "lag_2": lag_2,
+                            "lag_3": lag_3,
+                            "rolling_mean_3": rolling_mean
+                        }])
+
+                        # 10. Generate prediction
+                        if automatic_model == "Linear Regression":
+
+                            prediction = linear_model.predict(
+                                automatic_features
+                            )[0]
+
+                        else:
+
+                            prediction = forest_model.predict(
+                                automatic_features
+                            )[0]
+
+                        prediction = max(0, float(prediction))
+
+                        # 11. Display results
+                        st.success(
+                            "Automatic prediction generated successfully!"
+                        )
+
+                        st.subheader("Prediction Results")
+
+                        st.write(
+                            "Prediction Date and Time:",
+                            next_time.strftime("%d-%m-%Y %H:%M")
+                        )
+
+                        st.metric(
+                            "Predicted Energy Consumption",
+                            f"{prediction:.3f} kWh"
+                        )
+
+                        st.metric(
+                            "Estimated Electricity Cost",
+                            f"{prediction * tariff:.2f}"
+                        )
+
+                        st.info(
+                            "This is an estimated next-hour "
+                            "electricity consumption value."
+                        )
+
+                        # 12. Display model input features
+                        with st.expander(
+                            "View Automatically Generated Features"
+                        ):
+
+                            st.dataframe(
+                                automatic_features,
+                                use_container_width=True
+                            )
+
+            except Exception as e:
+
+                st.error(
+                    f"Unable to generate prediction: {e}"
+                )
 
 # ----------------------------------
 # MODEL COMPARISON
