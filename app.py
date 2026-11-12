@@ -358,6 +358,42 @@ elif page == "Model Comparison":
             f"Best Performing Model: {best_model}"
         )
 
+        # Actual vs Predicted Consumption Graph
+
+        st.divider()
+        st.subheader("Actual vs Predicted Energy Consumption")
+
+        prediction_path = "results/predictions.csv"
+
+        if os.path.exists(prediction_path):
+
+            prediction_data = pd.read_csv(prediction_path)
+
+            st.write(
+                "Comparison of actual electricity consumption "
+                "with predictions from both machine learning models."
+            )
+
+            # Display a sample of 200 test observations
+            graph_data = prediction_data[
+                ["Actual", "Linear Regression", "Random Forest"]
+            ].head(200)
+
+            st.line_chart(
+                graph_data,
+                height=400
+            )
+
+            st.subheader("Prediction Data Preview")
+
+            st.dataframe(
+                prediction_data.head(10),
+                use_container_width=True
+            )
+
+        else:
+            st.warning("Prediction results file not found.")
+
     else:
 
         st.warning("Model comparison results not found.")
