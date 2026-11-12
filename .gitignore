@@ -1,0 +1,8 @@
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+dataset/household_power_consumption.txt
+*.zip
+.DS_Store
+.vscode/
