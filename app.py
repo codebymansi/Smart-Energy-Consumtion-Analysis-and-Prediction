@@ -205,6 +205,20 @@ elif page == "Data Analysis":
 
     st.line_chart(daily)
 
+    st.subheader("Monthly Average Power Consumption")
+
+    monthly = (
+        df.set_index("datetime")["Global_active_power"]
+        .resample("ME")
+        .mean()
+        .dropna()
+    )
+
+    st.bar_chart(
+        monthly,
+        height=350
+    )
+
 
 # ----------------------------------
 # ENERGY PREDICTION
